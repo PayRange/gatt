@@ -93,13 +93,18 @@ func (d *device) Init(f func(Device, State)) error {
 		}
 	}
 	d.hci.AdvertisementHandler = func(pd *linux.PlatData) {
-		a := &Advertisement{}
-		a.unmarshall(pd.Data)
-		a.Connectable = pd.Connectable
-		p := &peripheral{pd: pd, d: d}
 		if d.peripheralDiscovered != nil {
+			a := &Advertisement{}
+			a.unmarshall(pd.Data)
+			a.Connectable = pd.Connectable
+			p := &peripheral{pd: pd, d: d}
 			pd.Name = a.LocalName
 			d.peripheralDiscovered(p, a, int(pd.RSSI))
+		}
+		if d.peripheralDiscoveredRaw != nil {
+			pd.ParseName()
+			p := &peripheral{pd: pd, d: d}
+			d.peripheralDiscoveredRaw(p, pd.Data, int(pd.RSSI))
 		}
 	}
 	d.state = StatePoweredOn

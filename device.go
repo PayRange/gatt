@@ -99,6 +99,9 @@ type deviceHandler struct {
 	// peripheralDiscovered is called when a remote peripheral device is found during scan procedure.
 	peripheralDiscovered func(p Peripheral, a *Advertisement, rssi int)
 
+	// peripheralDiscoveredRaw is called when a remote peripheral device is found during scan procedure.
+	peripheralDiscoveredRaw func(p Peripheral, advData []byte, rssi int)
+
 	// peripheralConnected is called when a remote peripheral is conneted.
 	peripheralConnected func(p Peripheral, err error)
 
@@ -130,6 +133,11 @@ func CentralDisconnected(f func(Central)) Handler {
 // PeripheralDiscovered returns a Handler, which sets the specified function to be called when a remote peripheral device is found during scan procedure.
 func PeripheralDiscovered(f func(Peripheral, *Advertisement, int)) Handler {
 	return func(d Device) { d.(*device).peripheralDiscovered = f }
+}
+
+// PeripheralDiscoveredRaw returns a Handler, which sets the specified function to be called when a remote peripheral device is found during scan procedure.
+func PeripheralDiscoveredRaw(f func(Peripheral, []byte, int)) Handler {
+	return func(d Device) { d.(*device).peripheralDiscoveredRaw = f }
 }
 
 // PeripheralConnected returns a Handler, which sets the specified function to be called when a remote peripheral device connects.

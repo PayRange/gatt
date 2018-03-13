@@ -46,6 +46,21 @@ type PlatData struct {
 	Conn io.ReadWriteCloser
 }
 
+func (pd *PlatData) ParseName() {
+	b := pd.Data
+
+	for len(b) > 1 {
+		l, t := b[0], b[1]
+		if len(b) < int(1+l) {
+			break
+		}
+		if t == 8 || t == 9 {
+			pd.Name = string(b[2 : 1+l])
+		}
+		b = b[1+l:]
+	}
+}
+
 func NewHCI(devID int, chk bool, maxConn int) (*HCI, error) {
 	d, err := newDevice(devID, chk)
 	if err != nil {
