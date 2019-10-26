@@ -3,7 +3,7 @@ package gatt
 import (
 	"bytes"
 
-	"github.com/paypal/gatt/linux/cmd"
+	"github.com/PayRange/gatt/linux/cmd"
 )
 
 func ExampleLnxDeviceID() {
