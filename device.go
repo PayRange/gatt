@@ -1,6 +1,10 @@
 package gatt
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/PayRange/gatt/blukey"
+)
 
 var notImplemented = errors.New("not implemented")
 
@@ -102,6 +106,9 @@ type deviceHandler struct {
 	// peripheralDiscoveredRaw is called when a remote peripheral device is found during scan procedure.
 	peripheralDiscoveredRaw func(p Peripheral, advData []byte, rssi int)
 
+	// blukeyDiscovered is called when a BluKey is found during scan procedure.
+	blukeyDiscovered func(p Peripheral, a blukey.BlukeyAdv, rssi int)
+
 	// peripheralConnected is called when a remote peripheral is conneted.
 	peripheralConnected func(p Peripheral, err error)
 
@@ -138,6 +145,11 @@ func PeripheralDiscovered(f func(Peripheral, *Advertisement, int)) Handler {
 // PeripheralDiscoveredRaw returns a Handler, which sets the specified function to be called when a remote peripheral device is found during scan procedure.
 func PeripheralDiscoveredRaw(f func(Peripheral, []byte, int)) Handler {
 	return func(d Device) { d.(*device).peripheralDiscoveredRaw = f }
+}
+
+// BlukeyDiscovered returns a Handler, which sets the specified function to be called when a BluKey is found during scan procedure.
+func BlukeyDiscovered(f func(Peripheral, blukey.BlukeyAdv, int)) Handler {
+	return func(d Device) { d.(*device).blukeyDiscovered = f }
 }
 
 // PeripheralConnected returns a Handler, which sets the specified function to be called when a remote peripheral device connects.

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"net"
 
+	"github.com/PayRange/gatt/blukey"
 	"github.com/PayRange/gatt/linux"
 	"github.com/PayRange/gatt/linux/cmd"
 )
@@ -105,6 +106,12 @@ func (d *device) Init(f func(Device, State)) error {
 			pd.ParseName()
 			p := &peripheral{pd: pd, d: d}
 			d.peripheralDiscoveredRaw(p, pd.Data, int(pd.RSSI))
+		}
+		if d.blukeyDiscovered != nil {
+			if a := blukey.ParseAdData(pd.Data); a != nil {
+				p := &peripheral{pd: pd, d: d}
+				d.blukeyDiscovered(p, a, int(pd.RSSI))
+			}
 		}
 	}
 	d.state = StatePoweredOn
