@@ -107,7 +107,7 @@ type deviceHandler struct {
 	peripheralDiscoveredRaw func(p Peripheral, advData []byte, rssi int)
 
 	// blukeyDiscovered is called when a BluKey is found during scan procedure.
-	blukeyDiscovered func(p Peripheral, a blukey.BlukeyAdv, rssi int)
+	blukeyDiscovered func(p Peripheral, a blukey.Adv, rssi int)
 
 	// peripheralConnected is called when a remote peripheral is conneted.
 	peripheralConnected func(p Peripheral, err error)
@@ -148,7 +148,7 @@ func PeripheralDiscoveredRaw(f func(Peripheral, []byte, int)) Handler {
 }
 
 // BlukeyDiscovered returns a Handler, which sets the specified function to be called when a BluKey is found during scan procedure.
-func BlukeyDiscovered(f func(Peripheral, blukey.BlukeyAdv, int)) Handler {
+func BlukeyDiscovered(f func(Peripheral, blukey.Adv, int)) Handler {
 	return func(d Device) { d.(*device).blukeyDiscovered = f }
 }
 

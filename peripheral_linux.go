@@ -298,8 +298,7 @@ func (p *peripheral) WriteDescriptor(d *Descriptor, value []byte) error {
 	return nil
 }
 
-func (p *peripheral) setNotifyValue(c *Characteristic, flag uint16,
-	f func(*Characteristic, []byte, error)) error {
+func (p *peripheral) setNotifyValue(c *Characteristic, flag uint16, f func(*Characteristic, []byte, error)) error {
 	if c.cccd == nil {
 		return errors.New("no cccd") // FIXME
 	}

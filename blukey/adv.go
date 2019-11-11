@@ -4,10 +4,10 @@ import (
 	"encoding/binary"
 )
 
-type BlukeyAdv interface {
+type Adv interface {
 	DeviceId() uint32
 	AuthKey() uint32
-	CanConnect() bool
+	CanTransact() bool
 	SupportsMaintenance() bool
 	NeedsMaintenance() bool
 }
@@ -32,37 +32,37 @@ const (
 	AdvV1offline  AdvV1Status = 0xff
 )
 
-type BlukeyAdvV1 struct {
+type AdvV1 struct {
 	Id     uint32
 	Key    uint32
 	Flags  AdvV1Flags
 	Status AdvV1Status
 }
 
-func (v1 *BlukeyAdvV1) AuthKey() uint32 {
+func (v1 *AdvV1) AuthKey() uint32 {
 	return v1.Key
 }
 
-func (v1 *BlukeyAdvV1) CanConnect() bool {
+func (v1 *AdvV1) CanTransact() bool {
 	return v1.Status == AdvV1ready
 }
 
-func (v1 *BlukeyAdvV1) DeviceId() uint32 {
+func (v1 *AdvV1) DeviceId() uint32 {
 	return v1.Id
 }
 
-func (v1 *BlukeyAdvV1) NeedsMaintenance() bool {
+func (v1 *AdvV1) NeedsMaintenance() bool {
 	return v1.Flags != AdvV1none
 }
 
-func (v1 *BlukeyAdvV1) SupportsMaintenance() bool {
+func (v1 *AdvV1) SupportsMaintenance() bool {
 	return v1.Flags != 0
 }
 
 var v1Name = []byte{0x09, 'P', 'a', 'y', 'R', 'a', 'n', 'g', 'e'}
 var v1BRSP = []byte{0x07, 0x79, 0x60, 0x22, 0xa0, 0xbe, 0xaf, 0xc0, 0xbd, 0xde, 0x48, 0x79, 0x62, 0xf1, 0x84, 0x2b, 0xda}
 
-func parseBlukeyV1Adv(raw []byte) *BlukeyAdvV1 {
+func parseBlukeyV1Adv(raw []byte) *AdvV1 {
 	var brsp, name bool
 	var msd []byte
 
@@ -98,7 +98,7 @@ func parseBlukeyV1Adv(raw []byte) *BlukeyAdvV1 {
 	}
 
 	if name && brsp && msd != nil {
-		return &BlukeyAdvV1{
+		return &AdvV1{
 			Id:     binary.LittleEndian.Uint32(msd[0:4]),
 			Key:    binary.LittleEndian.Uint32(msd[7:11]),
 			Flags:  AdvV1Flags(msd[5]),
@@ -112,6 +112,7 @@ func parseBlukeyV1Adv(raw []byte) *BlukeyAdvV1 {
 type AdvV2Flags uint16
 
 const (
+	AdvV2canTransact             AdvV2Flags = 0x2000
 	AdvV2cashPending             AdvV2Flags = 0x0800
 	AdvV2cashlessPending         AdvV2Flags = 0x0400
 	AdvV2machAlarmMask           AdvV2Flags = 0x03c0
@@ -130,7 +131,7 @@ const (
 	AdvV2statusOffline           AdvV2Flags = 0x0007
 )
 
-type BlukeyAdvV2 struct {
+type AdvV2 struct {
 	Id          uint32
 	Key         uint32
 	Flags       AdvV2Flags
@@ -138,24 +139,26 @@ type BlukeyAdvV2 struct {
 	PartnerData []byte
 }
 
-func (v2 *BlukeyAdvV2) AuthKey() uint32 {
+func (v2 *AdvV2) AuthKey() uint32 {
 	return v2.Key
 }
 
-func (v2 *BlukeyAdvV2) CanConnect() bool {
-	switch v2.Flags & AdvV2statusMask {
-	case AdvV2statusReady, AdvV2statusReadyMaint:
+func (v2 *AdvV2) CanTransact() bool {
+	if (v2.Flags & AdvV2statusMask) == AdvV2statusReady {
+		return true
+	}
+	if v2.Flags&AdvV2canTransact != 0 {
 		return true
 	}
 
 	return false
 }
 
-func (v2 *BlukeyAdvV2) DeviceId() uint32 {
+func (v2 *AdvV2) DeviceId() uint32 {
 	return v2.Id
 }
 
-func (v2 *BlukeyAdvV2) NeedsMaintenance() bool {
+func (v2 *AdvV2) NeedsMaintenance() bool {
 	if v2.Flags&(AdvV2cashPending|AdvV2cashlessPending) != 0 {
 		return true
 	}
@@ -165,11 +168,11 @@ func (v2 *BlukeyAdvV2) NeedsMaintenance() bool {
 	return false
 }
 
-func (v2 *BlukeyAdvV2) SupportsMaintenance() bool {
+func (v2 *AdvV2) SupportsMaintenance() bool {
 	return true
 }
 
-func parseBlukeyV2Adv(raw []byte) *BlukeyAdvV2 {
+func parseBlukeyV2Adv(raw []byte) *AdvV2 {
 	var name bool
 	var msd1, msd2 []byte
 
@@ -191,7 +194,7 @@ func parseBlukeyV2Adv(raw []byte) *BlukeyAdvV2 {
 	}
 
 	if name && msd1 != nil {
-		a := &BlukeyAdvV2{
+		a := &AdvV2{
 			Id:        binary.LittleEndian.Uint32(msd1[0:4]),
 			Key:       binary.LittleEndian.Uint32(msd1[4:8]),
 			Flags:     AdvV2Flags(binary.LittleEndian.Uint16(msd1[8:10])),
@@ -209,7 +212,7 @@ func parseBlukeyV2Adv(raw []byte) *BlukeyAdvV2 {
 	return nil
 }
 
-func ParseAdData(raw []byte) BlukeyAdv {
+func ParseAdData(raw []byte) Adv {
 	if v1 := parseBlukeyV1Adv(raw); v1 != nil {
 		return v1
 	}

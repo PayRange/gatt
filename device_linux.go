@@ -108,9 +108,12 @@ func (d *device) Init(f func(Device, State)) error {
 			d.peripheralDiscoveredRaw(p, pd.Data, int(pd.RSSI))
 		}
 		if d.blukeyDiscovered != nil {
-			if a := blukey.ParseAdData(pd.Data); a != nil {
+			if bka := blukey.ParseAdData(pd.Data); bka != nil {
+				a := &Advertisement{}
+				a.unmarshall(pd.Data)
 				p := &peripheral{pd: pd, d: d}
-				d.blukeyDiscovered(p, a, int(pd.RSSI))
+				pd.Name = a.LocalName
+				d.blukeyDiscovered(p, bka, int(pd.RSSI))
 			}
 		}
 	}

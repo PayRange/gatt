@@ -2,11 +2,13 @@ package gatt
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
 	ErrNotBRSP = errors.New("Peripheral does not implement BRSP")
 	ErrTimeout = errors.New("BRSP timeout")
+	ErrClosed  = errors.New("BRSP was closed")
 
 	brspService = MustParseUUID("DA2B84F1-6279-48DE-BDC0-AFBEA0226079")
 	brspMode    = MustParseUUID("A87988B9-694C-479C-900E-95DFA6C00A24")
@@ -66,6 +68,48 @@ func (b *BRSP) Write(p []byte) (int, error) {
 	b.writeReq <- p
 
 	return len(p), nil
+}
+
+func (b *BRSP) discover() error {
+	svcs, err := b.p.DiscoverServices([]UUID{brspService})
+	if err != nil {
+		return err
+	}
+
+	for _, s := range svcs {
+		if s.UUID().Equal(brspService) {
+			b.brspService = s
+			break
+		}
+	}
+	if b.brspService == nil {
+		return ErrNotBRSP
+	}
+
+	chars, err := b.p.DiscoverCharacteristics([]UUID{brspMode, brspRx, brspTx}, b.brspService)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range chars {
+		u := c.UUID()
+		if u.Equal(brspMode) {
+			b.brspMode = c
+		} else if u.Equal(brspRx) {
+			b.brspRx = c
+		} else if u.Equal(brspTx) {
+			b.brspTx = c
+		}
+	}
+	if b.brspMode == nil || b.brspRx == nil || b.brspTx == nil {
+		return ErrNotBRSP
+	}
+
+	if _, err := b.p.DiscoverDescriptors(nil, b.brspTx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *BRSP) handleFlushReq(c chan error) {
@@ -146,39 +190,45 @@ func (b *BRSP) handleWriteReq(p []byte) {
 }
 
 func (b *BRSP) init() error {
-	svcs, err := b.p.DiscoverServices([]UUID{brspService})
-	if err != nil {
+	if err := b.discover(); err != nil {
 		return err
 	}
 
-	for _, s := range svcs {
-		if s.UUID().Equal(brspService) {
-			b.brspService = s
-			break
-		}
-	}
-	if b.brspService == nil {
-		return ErrNotBRSP
+	if err := b.p.SetIndicateValue(b.brspTx, nil); err != nil {
+		return err
 	}
 
-	for _, c := range b.brspService.Characteristics() {
-		u := c.UUID()
-		if u.Equal(brspMode) {
-			b.brspMode = c
-		} else if u.Equal(brspRx) {
-			b.brspRx = c
-		} else if u.Equal(brspTx) {
-			b.brspTx = c
-		}
+	onTx := func(c *Characteristic, data []byte, err error) {
+		fmt.Printf("brspTx %v: % x\n", err, data)
+		bi := brspIncoming{err: err}
+		bi.n = copy(bi.data[:], data)
+		b.incomingData <- bi
 	}
-	if b.brspMode == nil || b.brspRx == nil || b.brspTx == nil {
-		return ErrNotBRSP
+
+	if err := b.p.SetIndicateValue(b.brspTx, onTx); err != nil {
+		return err
+	}
+
+	if err := b.p.WriteCharacteristic(b.brspMode, []byte{1}, true); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (b *BRSP) loop() {
+	defer func() {
+		for _, c := range b.flushReqs {
+			c <- ErrClosed
+		}
+
+		for _, r := range b.readReqs {
+			r.r <- brspResult{
+				err: ErrClosed,
+			}
+		}
+	}()
+
 	for {
 		if b.txMode {
 			select {
@@ -220,9 +270,12 @@ func (b *BRSP) writer() {
 	for {
 		select {
 		case d := <-b.outgoingData:
-			_ = d
-			// transmit data
-			// send any resulting errors to b.writeErrors
+			if d.n > 0 {
+				fmt.Printf("brspRx % x (%s)\n", d.data[:d.n], string(d.data[:d.n]))
+				if err := b.p.WriteCharacteristic(b.brspRx, d.data[:d.n], true); err != nil {
+					b.writeErrors <- err
+				}
+			}
 		case <-b.closed:
 			return
 		}
